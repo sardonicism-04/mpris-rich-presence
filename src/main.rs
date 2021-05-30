@@ -1,15 +1,13 @@
 use dbus::blocking::Connection;
 use discord_rich_presence::{new_client, DiscordIpc};
 use serde_json::json;
-use std::{convert::From, error::Error, thread::sleep, time::Duration};
+use std::{error::Error, thread::sleep, time::Duration};
 use urlencoding::decode;
 
 mod helpers;
 mod monitor;
 
 const DISCORD_APP_ID: &str = "831641858643460106";
-// Players that have an icon supported
-const KNOWN_PLAYERS: [&str; 3] = ["vlc", "strawberry", "audacious"];
 
 fn main() -> Result<(), Box<dyn Error>> {
     let conn = Connection::new_session()?;
@@ -66,13 +64,6 @@ fn update_presence(
     };
 
     let state = format!("{} - {}", data["artist"], data["album"]);
-    let mut large_image: String = String::from("large-icon");
-    if KNOWN_PLAYERS.contains(&player.as_str()) {
-        large_image += &format!("-{}", player).as_str();
-    } else {
-        large_image += "-unknown";
-    }
-
     let mut payload = json!({
         "state": state.chars().take(128).collect::<String>(),
         "details": data["title"].chars().take(128).collect::<String>(),
@@ -81,23 +72,13 @@ fn update_presence(
         },
         "assets": {
             "large_text": format!("Listening with {}", &player),
-            "large_image": large_image,
-            "small_text": "Playing",
-            "small_image": "status-playing"
+            "large_image": "logo",
         }
     });
 
     if !helpers::is_playing(&player, &conn)? {
         let data = payload.as_object_mut().unwrap();
         data.remove("timestamps");
-        data["assets"]
-            .as_object_mut()
-            .unwrap()
-            .insert(String::from("small_text"), "Paused".into());
-        data["assets"]
-            .as_object_mut()
-            .unwrap()
-            .insert(String::from("small_image"), "status-paused".into());
         payload = data.clone().into();
     }
 
