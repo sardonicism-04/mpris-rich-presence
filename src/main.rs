@@ -15,13 +15,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     monitor::add_conn_match(&conn)?;
 
     loop {
-        match ipc.get_valid_path()? {
-            Some(_) => {
-                ipc.connect()?;
-                break;
-            }
-            None => continue,
-        };
+        if ipc.connect().is_ok() {
+            break;
+        } else {
+            continue;
+        }
     }
 
     let mut has_closed = false;
@@ -31,11 +29,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             sleep(Duration::from_millis(500));
             update_presence(&conn, &mut ipc)?;
             has_closed = false;
-        } else if helpers::get_player(&conn)?.is_none()
-            && !has_closed
-            && ipc.get_valid_path()?.is_some()
-        {
-            ipc.reconnect()?;
+        } else if helpers::get_player(&conn)?.is_none() && !has_closed && ipc.reconnect().is_ok() {
             has_closed = true;
         }
     }
@@ -82,8 +76,8 @@ fn update_presence(
         payload = data.clone().into();
     }
 
-    if ipc.set_activity(payload).is_err() && ipc.get_valid_path()?.is_some() {
-        ipc.reconnect()?
+    if ipc.set_activity(payload).is_err() {
+        ipc.reconnect().ok();
     }
 
     Ok(())
