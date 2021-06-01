@@ -18,6 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         if ipc.connect().is_ok() {
             break;
         } else {
+            sleep(Duration::from_secs(5));
             continue;
         }
     }
@@ -31,6 +32,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             has_closed = false;
         } else if helpers::get_player(&conn)?.is_none() && !has_closed && ipc.reconnect().is_ok() {
             has_closed = true;
+        } else {
+            sleep(Duration::from_secs(5));
         }
     }
 }
@@ -41,7 +44,10 @@ fn update_presence(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let player = match helpers::get_player(&conn)? {
         Some(val) => val,
-        None => return Ok(()),
+        None => {
+            sleep(Duration::from_secs(5));
+            return Ok(());
+        }
     };
 
     let proxy = conn.with_proxy(
