@@ -58,17 +58,20 @@ fn update_presence(
         "assets": {
             "large_text": format!("Listening with {}", &player),
             "large_image": "logo",
+            "small_text": "Playing",
+            "small_image": "playing"
         }
     });
 
-    let payload_obj = payload.as_object_mut().unwrap();
-    let end_time = helpers::get_end_time(&proxy)?;
-    if end_time.is_some() {
-        if helpers::is_playing(&player, &conn)? {
-            payload_obj.insert("timestamps".into(), json!({ "end": end_time.unwrap() }));
+    if helpers::is_playing(&player, &conn)? {
+        let end_time = helpers::get_end_time(&proxy)?;
+        if end_time.is_some() {
+            payload["timestamps"]["end"] = end_time.unwrap().into();
         }
+    } else {
+        payload["assets"]["small_text"] = "Paused".into();
+        payload["assets"]["small_image"] = "paused".into();
     }
-    payload = payload_obj.clone().into();
 
     if ipc.set_activity(payload).is_err() {
         ipc.reconnect().ok();
