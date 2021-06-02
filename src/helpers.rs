@@ -6,6 +6,8 @@ use dbus::{
 use std::{collections::HashMap, time::Duration as StdDuration};
 
 const MPRIS_PREFIX: &str = "org.mpris.MediaPlayer2.";
+const IGNORED_PLAYER_SUBSTRINGS: [&str; 1] = [".instance"];
+// Ignore browser instances
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -36,6 +38,12 @@ pub fn get_player(conn: &Connection) -> Result<Option<String>> {
     for name in names
         .iter_mut()
         .filter_map(|n| n.as_str().strip_prefix(MPRIS_PREFIX))
+        .filter(|n| {
+            for substring in &IGNORED_PLAYER_SUBSTRINGS {
+                return !n.contains(substring);
+            }
+            false
+        })
     {
         player = name.to_string();
         match is_playing(name, &conn)? {
@@ -51,9 +59,13 @@ pub fn get_player(conn: &Connection) -> Result<Option<String>> {
     Ok(Some(player))
 }
 
-pub fn get_end_time(proxy: &Proxy<&Connection>) -> Result<i64> {
+pub fn get_end_time(proxy: &Proxy<&Connection>) -> Result<Option<i64>> {
     let metadata: arg::PropMap = proxy.get("org.mpris.MediaPlayer2.Player", "Metadata")?;
     let position: i64 = proxy.get("org.mpris.MediaPlayer2.Player", "Position")?;
+
+    if position == 0 {
+        return Ok(None);
+    }
 
     let len_data: Option<&i64> = arg::prop_cast(&metadata, "mpris:length");
     let len: i64 = match len_data {
@@ -63,7 +75,7 @@ pub fn get_end_time(proxy: &Proxy<&Connection>) -> Result<i64> {
     let remaining = Duration::microseconds(len - position);
 
     let end = Local::now() + remaining;
-    Ok(end.timestamp())
+    Ok(Some(end.timestamp()))
 }
 
 pub fn get_data(proxy: &Proxy<&Connection>) -> Result<HashMap<String, String>> {

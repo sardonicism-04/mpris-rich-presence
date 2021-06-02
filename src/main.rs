@@ -2,7 +2,6 @@ use dbus::blocking::Connection;
 use discord_rich_presence::{new_client, DiscordIpc};
 use serde_json::json;
 use std::{error::Error, thread::sleep, time::Duration};
-use urlencoding::decode;
 
 mod helpers;
 mod monitor;
@@ -52,30 +51,24 @@ fn update_presence(
     );
     let data = helpers::get_data(&proxy)?;
 
-    let uri = decode(&data["url"])?;
-    match uri.strip_prefix("file://") {
-        Some(_) => (),
-        None => return Ok(()),
-    };
-
     let state = format!("{} - {}", data["artist"], data["album"]);
     let mut payload = json!({
         "state": state.chars().take(128).collect::<String>(),
         "details": data["title"].chars().take(128).collect::<String>(),
-        "timestamps": {
-            "end": helpers::get_end_time(&proxy)?
-        },
         "assets": {
             "large_text": format!("Listening with {}", &player),
             "large_image": "logo",
         }
     });
 
-    if !helpers::is_playing(&player, &conn)? {
-        let data = payload.as_object_mut().unwrap();
-        data.remove("timestamps");
-        payload = data.clone().into();
+    let payload_obj = payload.as_object_mut().unwrap();
+    let end_time = helpers::get_end_time(&proxy)?;
+    if end_time.is_some() {
+        if helpers::is_playing(&player, &conn)? {
+            payload_obj.insert("timestamps".into(), json!({ "end": end_time.unwrap() }));
+        }
     }
+    payload = payload_obj.clone().into();
 
     if ipc.set_activity(payload).is_err() {
         ipc.reconnect().ok();
