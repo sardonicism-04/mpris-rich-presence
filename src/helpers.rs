@@ -6,7 +6,7 @@ use dbus::{
 use std::{collections::HashMap, time::Duration as StdDuration};
 
 const MPRIS_PREFIX: &str = "org.mpris.MediaPlayer2.";
-const IGNORED_PLAYER_SUBSTRINGS: [&str; 1] = [".instance"];
+const INSTANCE_PLAYERS: &str = ".instance";
 // Ignore browser instances
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -22,8 +22,7 @@ pub fn is_playing(player: &str, conn: &Connection) -> Result<bool> {
 
     match status.as_str() {
         "Playing" => Ok(true),
-        "Paused" => Ok(false),
-        "Stopped" => Ok(false),
+        "Paused" | "Stopped" => Ok(false),
         _ => panic!("Somehow got a status other than \"Playing\", \"Paused\", or \"Stopped\""),
     }
 }
@@ -38,18 +37,13 @@ pub fn get_player(conn: &Connection) -> Result<Option<String>> {
     for name in names
         .iter_mut()
         .filter_map(|n| n.as_str().strip_prefix(MPRIS_PREFIX))
-        .filter(|n| {
-            for substring in &IGNORED_PLAYER_SUBSTRINGS {
-                return !n.contains(substring);
-            }
-            false
-        })
+        .filter(|n| !n.contains(INSTANCE_PLAYERS))
     {
         player = name.to_string();
-        match is_playing(name, &conn)? {
-            true => break,
-            false => continue,
-        };
+        if is_playing(name, &conn)? {
+            break;
+        }
+        continue;
     }
 
     if player.is_empty() {
@@ -83,7 +77,7 @@ pub fn get_data(proxy: &Proxy<&Connection>) -> Result<HashMap<String, String>> {
 
     let metadata: arg::PropMap = proxy.get("org.mpris.MediaPlayer2.Player", "Metadata")?;
 
-    for key in ["xesam:title", "xesam:album", "xesam:url"].iter() {
+    for key in &["xesam:title", "xesam:album", "xesam:url"] {
         let value_data: Option<&String> = arg::prop_cast(&metadata, key);
         let value: String = match value_data {
             Some(val) => val.to_string(),

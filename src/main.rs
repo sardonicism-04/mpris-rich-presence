@@ -16,10 +16,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     loop {
         if ipc.connect().is_ok() {
             break;
-        } else {
-            sleep(Duration::from_secs(1));
-            continue;
         }
+        sleep(Duration::from_secs(1));
+        continue;
     }
 
     let mut has_closed = false;
