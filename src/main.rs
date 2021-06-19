@@ -1,6 +1,5 @@
 use dbus::blocking::Connection;
-use discord_rich_presence::{new_client, DiscordIpc};
-use serde_json::json;
+use discord_rich_presence::{activity, new_client, DiscordIpc};
 use std::{error::Error, thread::sleep, time::Duration};
 
 mod helpers;
@@ -50,26 +49,30 @@ fn update_presence(
     );
     let data = helpers::get_data(&proxy)?;
 
-    let state = format!("{} - {}", data["artist"], data["album"]);
-    let mut payload = json!({
-        "state": state.chars().take(128).collect::<String>(),
-        "details": data["title"].chars().take(128).collect::<String>(),
-        "assets": {
-            "large_text": format!("Listening with {}", &player),
-            "large_image": "logo",
-            "small_text": "Playing",
-            "small_image": "playing"
-        }
-    });
+    let state: String = format!("{} - {}", data["artist"], data["album"])
+        .chars()
+        .take(128)
+        .collect();
+    let details: String = data["title"].chars().take(128).collect();
+    let large_text: String = format!("Listening with {}", &player);
+    let assets = activity::Assets::new()
+        .large_text(large_text.as_str())
+        .large_image("logo")
+        .small_text("Playing")
+        .small_image("playing");
+    let mut payload = activity::Activity::new()
+        .state(&state)
+        .details(&details)
+        .assets(assets.clone());
 
     if helpers::is_playing(&player, &conn)? {
         let end_time = helpers::get_end_time(&proxy)?;
         if end_time.is_some() {
-            payload["timestamps"]["end"] = end_time.unwrap().into();
+            payload = payload.timestamps(activity::Timestamps::new().end(end_time.unwrap() as i32));
         }
     } else {
-        payload["assets"]["small_text"] = "Paused".into();
-        payload["assets"]["small_image"] = "paused".into();
+        let assets = assets.clone().small_text("Paused").small_image("paused");
+        payload = payload.assets(assets);
     }
 
     if ipc.set_activity(payload).is_err() {
