@@ -1,6 +1,10 @@
 use dbus::blocking::Connection;
 use discord_rich_presence::{activity, new_client, DiscordIpc};
-use std::{error::Error, thread::sleep, time::Duration};
+use std::{
+    error::Error,
+    thread::sleep,
+    time::{Duration, Instant},
+};
 
 mod helpers;
 mod monitor;
@@ -21,21 +25,31 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     let mut has_closed = false;
+    let mut last_updated = Instant::now();
     loop {
-        if conn.process(Duration::from_millis(5000))? {
+        if conn.process(Duration::from_secs(5))? {
             // Defer presence update so timestamps on seek are accurate
-            sleep(Duration::from_millis(500));
-            update_presence(&conn, &mut ipc)?;
+            sleep(Duration::from_millis(1000));
+            update_presence(&conn, &mut ipc, &mut last_updated)?;
             has_closed = false;
+            continue;
+        } else if Instant::now().duration_since(last_updated).as_secs() >= 30 {
+            if update_presence(&conn, &mut ipc, &mut last_updated).is_ok() {
+                has_closed = false;
+                continue;
+            }
         } else if helpers::get_player(&conn)?.is_none() && !has_closed && ipc.reconnect().is_ok() {
             has_closed = true;
+            continue;
         }
+        sleep(Duration::from_secs(1));
     }
 }
 
 fn update_presence(
     conn: &Connection,
     ipc: &mut impl DiscordIpc,
+    last_updated: &mut Instant,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let player = match helpers::get_player(&conn)? {
         Some(val) => val,
@@ -67,16 +81,20 @@ fn update_presence(
 
     if helpers::is_playing(&player, &conn)? {
         let end_time = helpers::get_end_time(&proxy)?;
-        if end_time.is_some() {
-            payload = payload.timestamps(activity::Timestamps::new().end(end_time.unwrap() as i32));
-        }
+        if let Some(end_time) = end_time {
+            payload = payload.timestamps(activity::Timestamps::new().end(end_time as i32));
+        };
     } else {
         let assets = assets.clone().small_text("Paused").small_image("paused");
         payload = payload.assets(assets);
     }
 
-    if ipc.set_activity(payload).is_err() {
-        ipc.reconnect().ok();
+    if Instant::now().duration_since(*last_updated).as_secs() >= 5 {
+        if ipc.set_activity(payload).is_err() {
+            ipc.reconnect().ok();
+        } else {
+            *last_updated = Instant::now();
+        }
     }
 
     Ok(())
