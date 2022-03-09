@@ -21,8 +21,7 @@ pub fn is_playing(player: &str, conn: &Connection) -> Result<bool> {
     let status: String = proxy.get("org.mpris.MediaPlayer2.Player", "PlaybackStatus")?;
 
     match status.as_str() {
-        "Playing" => Ok(true),
-        "Paused" | "Stopped" => Ok(false),
+        "Playing" => Ok(true),"Paused" | "Stopped" => Ok(false),
         _ => panic!("Somehow got a status other than \"Playing\", \"Paused\", or \"Stopped\""),
     }
 }
@@ -40,7 +39,7 @@ pub fn get_player(conn: &Connection) -> Result<Option<String>> {
         .filter(|n| !n.contains(INSTANCE_PLAYERS))
     {
         player = name.to_string();
-        if is_playing(name, &conn)? {
+        if is_playing(name, conn)? {
             break;
         }
         continue;

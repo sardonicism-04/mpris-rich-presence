@@ -1,5 +1,5 @@
 use dbus::blocking::Connection;
-use discord_rich_presence::{activity, new_client, DiscordIpc};
+use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
 use std::{
     error::Error,
     thread::sleep,
@@ -13,7 +13,7 @@ const DISCORD_APP_ID: &str = "831641858643460106";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let conn = Connection::new_session()?;
-    let mut ipc = new_client(&DISCORD_APP_ID)?;
+    let mut ipc = DiscordIpcClient::new(DISCORD_APP_ID)?;
     monitor::add_conn_match(&conn)?;
 
     loop {
@@ -51,7 +51,7 @@ fn update_presence(
     ipc: &mut impl DiscordIpc,
     last_updated: &mut Instant,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let player = match helpers::get_player(&conn)? {
+    let player = match helpers::get_player(conn)? {
         Some(val) => val,
         None => return Ok(()),
     };
@@ -79,10 +79,10 @@ fn update_presence(
         .details(&details)
         .assets(assets.clone());
 
-    if helpers::is_playing(&player, &conn)? {
+    if helpers::is_playing(&player, conn)? {
         let end_time = helpers::get_end_time(&proxy)?;
         if let Some(end_time) = end_time {
-            payload = payload.timestamps(activity::Timestamps::new().end(end_time as i32));
+            payload = payload.timestamps(activity::Timestamps::new().end(end_time as i64));
         };
     } else {
         let assets = assets.clone().small_text("Paused").small_image("paused");
