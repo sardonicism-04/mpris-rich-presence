@@ -22,13 +22,13 @@ WantedBy=default.target
 ## Installation
 Requires the latest Rust compiler:
 ```sh
-cargo install --git https://github.com/sardonicism-04/mpris-rp --branch main mpris-rp
+cargo install --git https://github.com/sardonicism-04/mpris-rich-presence --branch main mpris-rp
 ```
 
 Or, building from source:
 ```sh
-git clone https://github.com/sardonicism-04/mpris-rp.git # via HTTPS
-git clone git@github.com:sardonicism-04/mpris-rp.git     # via SSH
+git clone https://github.com/sardonicism-04/mpris-rich-presence.git # via HTTPS
+git clone git@github.com:sardonicism-04/mpris-rich-presence.git     # via SSH
 
 cd mpris-rp
 
